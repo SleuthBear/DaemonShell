@@ -1,0 +1,7 @@
+Hello reader! My name is Dr Adalbert C. Hollenfeuer. I am an avid anthropologist/computer scientist.
+This is my first journal entry, and I am writing to document my experiences at my new job working at Grandbench Global.
+
+Of course, computer science was always a side project of mine, but since my untimely dismissal from my fellowship at UC Berkeley,
+I sure am glad that I had a second skillset. Who knows? Maybe I can become the first digital anthopologist!
+
+My first task at Grandbench is to rebuild their payment processing system from the ground up. I'll admit that task does sound daunting.

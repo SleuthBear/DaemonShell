@@ -1,0 +1,76 @@
+{
+    "name": "root",
+    "type": 0,
+    "file_ref": "root_3051882669",
+    "children": [
+        {
+            "name": "Logs.lock",
+            "type": 1,
+            "children": [],
+            "file_ref": "Logs_1807696380.lock"
+        },
+        {
+            "name": "Code.lock",
+            "type": 1,
+            "children": [],
+            "file_ref": "Code_163903526.lock"
+        },
+        {
+            "name": "Documents",
+            "type": 0,
+            "file_ref": "Documents_4215046222",
+            "children": [
+                {
+                    "name": "Career",
+                    "type": 0,
+                    "file_ref": "Career_4249592771",
+                    "children": [
+                        {
+                            "name": "Resume.txt",
+                            "type": 1,
+                            "children": [],
+                            "file_ref": "Resume_1691585374.txt"
+                        }
+                    ]
+                },
+                {
+                    "name": "passwords.txt",
+                    "type": 1,
+                    "children": [],
+                    "file_ref": "passwords_697237333.txt"
+                },
+                {
+                    "name": "Notes",
+                    "type": 0,
+                    "file_ref": "Notes_3667005404",
+                    "children": [
+                        {
+                            "name": "for_emma.txt",
+                            "type": 1,
+                            "children": [],
+                            "file_ref": "for_emma_206555392.txt"
+                        },
+                        {
+                            "name": "groceries.txt",
+                            "type": 1,
+                            "children": [],
+                            "file_ref": "groceries_2317558115.txt"
+                        }
+                    ]
+                },
+                {
+                    "name": "journals1.txt",
+                    "type": 1,
+                    "children": [],
+                    "file_ref": "journals1_1113276349.txt"
+                }
+            ]
+        },
+        {
+            "name": "Backup.lock",
+            "type": 1,
+            "children": [],
+            "file_ref": "Backup_755012715.lock"
+        }
+    ]
+}
