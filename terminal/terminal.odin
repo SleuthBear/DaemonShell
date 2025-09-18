@@ -5,10 +5,16 @@ import "core:os"
 import "base:runtime"
 import _t "../text"
 import _vfs "../virtual_fs"
+// todo consolidate
+import "../util"
+// todo consolidate
+import _l "lock"
+import _sl "lock/saved_locks"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
 import "core:strings"
+import "core:container/queue"
 
 MAX_LINES :: 200
 RED :: [?]f32{1.0, 0.5, 0.5}
@@ -30,7 +36,7 @@ Terminal :: struct {
         tex: u32,
         shader: u32,
         node: ^_vfs.Node,
-        alloc: runtime.Allocator
+        game_stack: ^queue.Queue(util.Layer)
 }
 
 Line :: struct {
@@ -44,7 +50,12 @@ Side :: enum {
         USER,
 }
 
-init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32) -> Terminal {
+init_terminal :: proc(_width: ^f32, _height: ^f32, _game_stack: ^queue.Queue(util.Layer)) -> Terminal {
+        shade, shade_ok := gl.load_shaders_file("../shaders/text.vert", "../shaders/text.frag")
+        if !shade_ok {
+                fmt.println("Failed to create shader for terminal")
+                os.exit(1)
+        }
         term := Terminal{
                width = _width,
                height = _height,
@@ -52,8 +63,8 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32) -> Terminal {
                end = 0,
                start = 1,
                window = 1,
-               shader = _shader,
-               alloc = runtime.heap_allocator()
+               shader = shade,
+               game_stack = _game_stack,
         }
         term.lines[1] = {"", WHITE, Side.USER}
         gl.GenVertexArrays(1, &term.VAO)
@@ -63,7 +74,8 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32) -> Terminal {
         return term 
 }
 
-update :: proc(term: ^Terminal, window: glfw.WindowHandle) {
+update :: proc(term: rawptr, window: glfw.WindowHandle) -> int {
+        term := cast(^Terminal)term
         if !term.active {
                 glfw.SetWindowUserPointer(window, term)
                 glfw.SetCharCallback(window, char_callback)
@@ -79,6 +91,7 @@ update :: proc(term: ^Terminal, window: glfw.WindowHandle) {
         clear(&term.vecs)
         push_lines(term)
         _t.render(term.vecs, term.tex, term.VAO, term.VBO)
+        return 0 
 }
 
 //todo add dynamic text scale
@@ -110,7 +123,8 @@ push_lines :: proc(term: ^Terminal) {
                                                 })
                         }
                 }
-                wraps: [dynamic]u32 = _t.wrap_lines(to_display, term.chars, term.width^-30, scale)
+                wraps := _t.wrap_lines(to_display, term.chars, term.width^-30, scale)
+                defer delete(wraps)
                 printed_lines += len(wraps)
                 // todo repace with line height 
                 line_y: f32 = f32(printed_lines) * line_height
@@ -143,7 +157,9 @@ add_line :: proc(term: ^Terminal, line: Line) {
         term.window = term.start
 }
 
-//Callback Functions
+// Callback Functions
+// TODO this whole thing feels crappy. I get that the performance impact is negligible, but it's an unecessary allocation'
+// maybe just assign 1000 chars of capacity up front? Not sure how to do that with a backing array.
 char_callback :: proc "c" (window: glfw.WindowHandle, code: rune) {
         term: ^Terminal = cast(^Terminal)glfw.GetWindowUserPointer(window)
         context = runtime.default_context()
@@ -208,16 +224,13 @@ auto_complete :: proc(term: ^Terminal) {
         for i>=0 && term.lines[term.start].txt[i] != ' ' {
                 i -= 1
         }
-        fmt.println(i)
         to_complete: string = term.lines[term.start].txt[i+1:term.cursor]
-        fmt.println("to_complete", to_complete)
         // Step back until we find the section that defines a path
         i = len(to_complete) - 1
         for i>=0 && to_complete[i] != '/' {
                 i-=1
         }
         pos: ^_vfs.Node = _vfs.follow_path(term.node, to_complete[:i+1])
-        fmt.println(pos.name)
         if pos == nil {
                 return
         }
@@ -264,7 +277,6 @@ read_command :: proc(term: ^Terminal, command: string) {
         if len(args) == 0 {
                 return
         }
-        fmt.println(args[0])
         switch args[0] {
                 case "ls": {
                         if len(args) == 1 {
@@ -285,7 +297,6 @@ read_command :: proc(term: ^Terminal, command: string) {
                                 add_line(term, {strings.clone("Specify a file."), RED, Side.SYS})
                                 return
                         }
-                        fmt.println(os.get_current_directory())
                         cat(term, args[1])
                 }
         }
@@ -313,14 +324,24 @@ ls :: proc(term: ^Terminal, path: string) {
 
 cd :: proc(term: ^Terminal, path: string) {
         node: ^_vfs.Node = _vfs.follow_path(term.node, path)
-        node = _vfs.follow_path(term.node, path)
         if node == nil {
                 add_line(term, {strings.clone("Invalid path."), RED, Side.SYS})
                 return
         }
         if strings.contains(node.name, ".lock") {
-                // TODO Locks_Opened check
-                // TODO locked/unlocked logic
+                info := _sl.locks[node.file_ref]
+                config := _l.Lock_Config{
+                        hint = info.hint,
+                        answer = info.answer,
+                        shader = term.shader,
+                        tex = term.tex,
+                        chars = term.chars,
+                        width = term.width,
+                        height = term.height,
+                }
+                lock := _l.init_lock(config, node)
+                queue.push_back(term.game_stack, util.Layer{lock, _l.update}) 
+                term.active = false
         }
         // TODO Dialogue
         term.node = node
@@ -341,7 +362,6 @@ cat :: proc(term: ^Terminal, path: string) {
         file_contents, ok := os.read_entire_file_from_filename(file_path)
         builder := strings.Builder{}
         strings.write_bytes(&builder, file_contents)
-        fmt.println(strings.to_string(builder))
         if !ok {
                 add_line(term, {strings.clone("Unable to open file."), RED, Side.SYS})
                 return

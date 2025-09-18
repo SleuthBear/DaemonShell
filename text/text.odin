@@ -87,6 +87,7 @@ create_bitmap :: proc(font_path: string, atlasTex: ^u32, chars: ^[128]Character)
 // TODO use indexes, not just a VBO
 push_line :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, x: f32, y: f32, scale: f32, col: [3]f32) {
         x := x
+        y := y - chars['X'].bearing[1] * scale
         for c in text {
                 ch: Character
                 if (c == '\n') {
@@ -95,7 +96,7 @@ push_line :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, x: f
                         ch = chars[c]
                 }
                 x_pos: f32 = x + ch.bearing[0] * scale
-                y_pos: f32 = y - (ch.size[1] - ch.bearing[1]) * scale
+                y_pos: f32 = y - (ch.size[1]-ch.bearing[1])*scale
                 w: f32 = ch.size[0] * scale
                 h: f32 = ch.size[1] * scale
                 append(vecs,
@@ -116,9 +117,9 @@ push_line :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, x: f
 wrap_and_push :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, x: f32, y: f32, width: f32, line_height: f32, col: [3]f32) {
         // Define the scale such that 1.2 * the height of '0' is a line
         scale := calc_char_scale(chars, line_height)
-        wraps: [dynamic]u32 = wrap_lines(text, chars, width, scale)
+        wraps := wrap_lines(text, chars, width, scale)
+        defer delete(wraps)
         idx: u32 = 0
-        x_pos := x
         y_pos := y
         for line in wraps {
                 push_line(text[idx:idx+line], vecs, chars, x, y_pos, scale, col)
@@ -130,7 +131,6 @@ wrap_and_push :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, 
 push_wrapped :: proc(text: string, vecs: ^[dynamic]f32, wraps: [dynamic]u32, chars: [128]Character, x: f32, y: f32, line_height: f32,  col: [3]f32) {
         scale := calc_char_scale(chars, line_height)
         idx: u32 = 0
-        x_pos := x
         y_pos := y
         for line in wraps {
                 push_line(text[idx:idx+line], vecs, chars, x, y_pos, scale, col)
@@ -178,9 +178,53 @@ wrap_lines :: proc(text: string, chars: [128]Character, width: f32, scale: f32) 
         append(&wraps, i - line_start)
         return wraps
 }
+// wraps the lines, returning the number of characters in each line, as well as the width of each line
+wrap_lines_with_widths :: proc(text: string, chars: [128]Character, width: f32, scale: f32) -> ([dynamic]u32, [dynamic]f32) {
+        line_end: u32 = 0
+        line_start: u32 = 0
+        x: f32 = 0
+        wraps: [dynamic]u32
+        widths: [dynamic]f32
+        word_width: f32 = 0
+        i: u32 = 0
+        for c in text {
+                ch: Character
+                if (c > 127) {
+                        ch = chars[32]
+                } else {
+                        ch = chars[c]
+                }
+                if (c == ' ' || c == '\n') && i > 2 {
+                        line_end = i
+                        word_width = 0
+                } else {
+                        word_width += f32(ch.advance >> 6) * scale
+                }
+                x_pos: f32 = x + ch.bearing[0] * scale
+                if x_pos >= width || (c == '\n' && int(i) != len(text)-1) {
+                        if line_end == 0 {
+                                append(&wraps, i-line_start)
+                                append(&widths, x)
+                                line_start = i
+                                x = 0     
+                        } else {
+                                append(&wraps, line_end-line_start+1)
+                                append(&widths, x-word_width)
+                                line_start = line_end+1
+                                x = word_width
+                        }
+                        line_end = 0
+                }
+                x += f32(ch.advance >> 6) * scale
+                i += 1
+        }
+        append(&wraps, i - line_start)
+        append(&widths, x)
+        return wraps, widths
+}
 
 calc_char_scale :: proc(chars: [128]Character, line_height: f32) -> f32 {
-        char_height := chars['0'].size[1] // want char_height * scale = 0.8*line_height
+        char_height := chars['X'].size[1] // want char_height * scale = 0.8*line_height
         return line_height*0.5 / char_height
 }
 
@@ -190,7 +234,6 @@ render :: proc(vecs: [dynamic]f32, atlas: u32, VAO: u32, VBO: u32) {
         }
         gl.BindVertexArray(VAO)
         gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
-        gl.EnableVertexAttribArray(0)
         gl.VertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 7*size_of(f32), uintptr(0))
         gl.EnableVertexAttribArray(0)
         gl.VertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, 7*size_of(f32), uintptr(2*size_of(f32)))
@@ -202,3 +245,43 @@ render :: proc(vecs: [dynamic]f32, atlas: u32, VAO: u32, VBO: u32) {
         gl.DrawArrays(gl.TRIANGLES, 0, i32(len(vecs) / 7))
 }
 
+// Scales the text to fit inside a box with appropriate wrapping
+wrap_center_and_push :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, x: f32, y: f32, width: f32, height: f32, col: [3]f32) {
+        line_height := get_line_height(width, height, text, chars)
+        scale := calc_char_scale(chars, line_height)
+        wraps, widths := wrap_lines_with_widths(text, chars, width, scale)
+        defer delete(wraps)
+        defer delete(widths)
+        idx: u32 = 0
+        y_pos := y - (height - line_height*f32(len(wraps))) / 2
+        i: u32 = 0
+        for line in wraps {
+                text_left := x + (width-widths[i])/2
+                push_line(text[idx:idx+line], vecs, chars, text_left, y_pos, scale, col)
+                idx += line
+                y_pos -= line_height
+                i += 1
+        }
+}
+
+// TODO figure out a proper algorithm for this, without iterating line wraps, as that is slow
+get_line_height :: proc(width: f32, height: f32, text: string, chars: [128]Character) -> f32 {
+        w := f32(chars['X'].size.x)
+        h := f32(chars['X'].size.y)
+        scale: f32 = 1
+        lh := h*scale/0.8
+        n_lines := 1
+        chars_per_line := len(text)
+        for f32(n_lines) * lh > height || w * scale * f32(chars_per_line) > width {
+                if w*scale*f32(chars_per_line) > width {
+                        n_lines += 1
+                        chars_per_line = len(text)/n_lines
+                }     
+                if lh*f32(n_lines) > height {
+                        n_lines -= 1
+                        scale -= 0.05
+                }
+                lh = h*scale/0.8
+        }
+        return lh*0.9
+}
