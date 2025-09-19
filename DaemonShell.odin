@@ -2,13 +2,16 @@ package main
 
 import "core:fmt"
 import "core:c"
+import "core:os"
 import "core:container/queue"
+import "core:time"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import _t "text"
 import _tml "terminal"
 import _lck "terminal/lock"
-import _mm "menu/main_menu"
+import _m "menu"
+import _imp "imp"
 import "ui"
 import "util"
 
@@ -47,37 +50,53 @@ main :: proc() {
         game_stack: queue.Queue(util.Layer)
         queue.init(&game_stack)
 
-        // TODO think about game_stack. Passing it to terminal works, but feels a bit strange.
-        terminal := _tml.init_terminal(&WIDTH, &HEIGHT, &game_stack)
-
-        lock_config := _lck.Lock_Config{
-                answer = "test passed",
-                hint = "Does it pass?",
-                shader = terminal.shader,
-                tex = terminal.tex,
-                chars = terminal.chars,
-                width = &WIDTH,
-                height = &HEIGHT,
+        text_shader, text_shade_ok := gl.load_shaders_file("../shaders/text.vert", "../shaders/text.frag")
+        if !text_shade_ok {
+                fmt.println("Failed to create text")
+                os.exit(1)
         }
-        lock := _lck.init_lock(lock_config, terminal.node)
-        
+        // TODO the if statement in this shader is slow. If we removed it we could have better performance with
+        // Only 1 more draw call. 
+        shader, shader_ok := gl.load_shaders_file("../shaders/ui.vert", "../shaders/ui.frag")
+        if !shader_ok {
+                fmt.println("Failed to create shader")
+                os.exit(1)
+        }
+
+        terminal := _tml.init_terminal(&WIDTH, &HEIGHT, text_shader, shader, &game_stack)
         queue.push_back(&game_stack, util.Layer{&terminal, _tml.update})
         
-        main_menu := _mm.init_main_menu(&WIDTH, &HEIGHT, terminal.shader, terminal.chars, terminal.tex)
+        main_menu := _m.init_main_menu(&WIDTH, &HEIGHT, text_shader, shader, terminal.chars, terminal.tex)
+        queue.push_back(&game_stack, util.Layer{main_menu, _m.update_main_menu})
+
+        imp := _imp.init_imp(shader, text_shader, terminal.tex, terminal.chars, &WIDTH, &HEIGHT)
+        terminal.imp = imp
+
         
-        queue.push_back(&game_stack, util.Layer{main_menu, _mm.update_main_menu})
+        st := time.Stopwatch{_accumulation = 1600000}
+        frame_count: f64 = 0
+        total_time: f64 = 0
         for !glfw.WindowShouldClose(window) {
+                time.stopwatch_stop(&st)
+                dt := time.duration_seconds(time.stopwatch_duration(st))
+                time.stopwatch_reset(&st)
+                time.stopwatch_start(&st)
+
                 glfw.PollEvents()
                 gl.ClearColor(0.0, 0.0, 0.0, 1.0)
                 gl.Clear(gl.COLOR_BUFFER_BIT)
                 
+
+
                 // This will use the current shader, so it must be set outside the render context. WITH the texture map.
                 layer: util.Layer = queue.back(&game_stack)
-                if layer.update(layer.state, window) == 1 {
+                if layer.update(layer.state, window, dt) == 1 {
                         queue.pop_back(&game_stack)
                 }
+
                 glfw.SwapBuffers((window))
         }
+
 }
 
 window_size_callback :: proc "c" (window: glfw.WindowHandle, width: i32, height: i32) {

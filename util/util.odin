@@ -10,7 +10,7 @@ import "core:os"
 // TODO add cleanup
 Layer :: struct {
         state: rawptr,
-        update: proc(rawptr, glfw.WindowHandle) -> int,
+        update: proc(rawptr, glfw.WindowHandle, f64) -> int,
 }
 
 load_texture :: proc(path: string) -> u32 {

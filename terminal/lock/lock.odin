@@ -57,7 +57,7 @@ init_lock :: proc(config: Lock_Config, node: ^_vfs.Node) -> ^Lock {
         return lock
 }
 
-update :: proc(lock: rawptr, window: glfw.WindowHandle) -> int {
+update :: proc(lock: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         lock := cast(^Lock)lock
         if !lock.active {
                 glfw.SetWindowUserPointer(window, lock);

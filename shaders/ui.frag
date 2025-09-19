@@ -8,10 +8,10 @@ uniform sampler2D tex;
 void main()
 {
         // -1 means no texture
-        if (tex_coords.x < -0.5) {
+        if (tex_coords.x < 0) {
                 color = vec4(frag_color, 1.0);
         } else {
-                color = vec4(frag_color, 1.0) * vec4(texture(tex, tex_coords).rgb, 1.0);
+                color = vec4(frag_color, 1.0) * texture(tex, tex_coords).rgba;
         }
 
 }

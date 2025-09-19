@@ -5,11 +5,13 @@ import "core:os"
 import "base:runtime"
 import _t "../text"
 import _vfs "../virtual_fs"
+import _m "../menu"
 // todo consolidate
 import "../util"
 // todo consolidate
 import _l "lock"
 import _sl "lock/saved_locks"
+import _imp "../imp"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
@@ -35,8 +37,10 @@ Terminal :: struct {
         active: bool,
         tex: u32,
         shader: u32,
+        vis_shader: u32,
         node: ^_vfs.Node,
-        game_stack: ^queue.Queue(util.Layer)
+        game_stack: ^queue.Queue(util.Layer),
+        imp: ^_imp.Imp,
 }
 
 Line :: struct {
@@ -50,12 +54,8 @@ Side :: enum {
         USER,
 }
 
-init_terminal :: proc(_width: ^f32, _height: ^f32, _game_stack: ^queue.Queue(util.Layer)) -> Terminal {
-        shade, shade_ok := gl.load_shaders_file("../shaders/text.vert", "../shaders/text.frag")
-        if !shade_ok {
-                fmt.println("Failed to create shader for terminal")
-                os.exit(1)
-        }
+init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u32, _game_stack: ^queue.Queue(util.Layer)) -> Terminal {
+        
         term := Terminal{
                width = _width,
                height = _height,
@@ -63,7 +63,8 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _game_stack: ^queue.Queue(uti
                end = 0,
                start = 1,
                window = 1,
-               shader = shade,
+               shader = _shader,
+               vis_shader = _vis_shader,
                game_stack = _game_stack,
         }
         term.lines[1] = {"", WHITE, Side.USER}
@@ -74,7 +75,7 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _game_stack: ^queue.Queue(uti
         return term 
 }
 
-update :: proc(term: rawptr, window: glfw.WindowHandle) -> int {
+update :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         term := cast(^Terminal)term
         if !term.active {
                 glfw.SetWindowUserPointer(window, term)
@@ -91,13 +92,14 @@ update :: proc(term: rawptr, window: glfw.WindowHandle) -> int {
         clear(&term.vecs)
         push_lines(term)
         _t.render(term.vecs, term.tex, term.VAO, term.VBO)
+        _imp.update(term.imp, window, dt)
         return 0 
 }
 
 //todo add dynamic text scale
 push_lines :: proc(term: ^Terminal) {
         // todo calculate line height here and pass it
-        line_height: f32 = 30
+        line_height: f32 = 25
         scale := _t.calc_char_scale(term.chars, line_height)
         printed_lines: int = 0
         for i: i32 = 0; printed_lines < int(term.height^ / line_height); i+=1 {
@@ -183,6 +185,10 @@ key_callback :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, ac
                 return
         }
         switch key {
+                case glfw.KEY_ESCAPE: {
+                        pause_menu := _m.init_pause_menu(term.width, term.height, term.shader, term.vis_shader, term.chars, term.tex)
+                        queue.push_back(term.game_stack, util.Layer{pause_menu, _m.update_pause_menu})
+                }
                 case glfw.KEY_ENTER: {
                         line_txt := term.lines[term.start].txt
                         if (len(line_txt) > 0) {
@@ -271,6 +277,15 @@ auto_complete :: proc(term: ^Terminal) {
 }
 
 read_command :: proc(term: ^Terminal, command: string) {
+        file_ref := term.node.file_ref
+        dialogue := term.imp.dialogue
+        if dialogue[file_ref] != nil {
+                for option in dialogue[file_ref] {
+                        if command == option[0] {
+                                _imp.add_text(term.imp, option[1])
+                        }
+                }
+        }
         args := strings.split(command, " ");
         defer delete(args)
         // TODO dialogue
@@ -343,7 +358,12 @@ cd :: proc(term: ^Terminal, path: string) {
                 queue.push_back(term.game_stack, util.Layer{lock, _l.update}) 
                 term.active = false
         }
-        // TODO Dialogue
+        if term.imp.dialogue[node.file_ref] != nil {
+                to_say := term.imp.dialogue[node.file_ref][0][1]
+                if to_say != "" {
+                        _imp.add_text(term.imp, to_say)
+                }
+        }
         term.node = node
 }
 

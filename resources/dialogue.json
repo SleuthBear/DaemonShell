@@ -1,0 +1,22 @@
+[
+  {
+    "file_ref": "root_3051882669",
+    "options": [
+      {"input": "", "response": "Welcome to the Daemon Shell. I'm Imp, a personal assistant invented by Dr. Hollenfeuer. Type help for more info!"},
+      {"input": "hello", "response": "Hi, I'm Imp!"},
+      {"input": "help", "response":  "Type ls to list directories. Type cd to enter a directory."}
+    ]
+  },
+  {
+    "file_ref": "Documents_4215046222",
+    "options": [
+      {"input":  "", "response": "This is Dr. Hollenfeuer's private files. Maybe you should pick a different directory?"}
+    ]
+  },
+  {
+    "file_ref": "Logs_1807696380.lock",
+    "options": [
+      {"input":  "", "response": "This is a locked directory. You need a password to access it."}
+    ]
+  }
+]

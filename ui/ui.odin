@@ -48,8 +48,8 @@ UI_Config :: struct {
         layout: Layout,
         width, height: ^f32,
         shader, text_shader, atlas, tex: u32,
+        chars: [128]_t.Character,        
         use_shader, use_text_shader: bool,
-        chars: [128]_t.Character        
 }
 
 init_ui :: proc(config: UI_Config) -> ^UI {
@@ -57,7 +57,7 @@ init_ui :: proc(config: UI_Config) -> ^UI {
         // Use shaders if they are provided, otherwise make them yourself. u32 defaults to 0 and no default struct values,
         // so this is required.
         ok: bool
-        if config.use_shader {
+        if config.shader > 0 {
                 ui.shader = config.shader
         } else {
                 ui.shader, ok = gl.load_shaders_file("../shaders/ui.vert", "../shaders/ui.frag")
@@ -68,7 +68,7 @@ init_ui :: proc(config: UI_Config) -> ^UI {
                         fmt.println("Created new shader")
                 }
         }
-        if config.use_text_shader {
+        if config.text_shader > 0 {
                 ui.text_shader = config.text_shader
                 fmt.println("Using provided shader")
         } else {

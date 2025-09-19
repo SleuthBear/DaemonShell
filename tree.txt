@@ -1,0 +1,56 @@
+.
+├── build
+│   ├── bitmap.jpg
+│   ├── debug.exe
+│   └── debug.exe.dSYM
+│       └── Contents
+│           ├── Info.plist
+│           └── Resources
+│               ├── DWARF
+│               │   └── debug.exe
+│               └── Relocations
+│                   └── aarch64
+│                       └── debug.exe.yml
+├── DaemonShell.odin
+├── imp
+│   └── imp.odin
+├── include
+│   └── freetype
+│       └── freetype.odin
+├── menu
+│   └── menu.odin
+├── resources
+│   ├── bitmap.jpg
+│   ├── dialogue.json
+│   ├── files
+│   │   ├── for_emma_206555392.txt
+│   │   ├── groceries_2317558115.txt
+│   │   ├── journals1_1113276349.txt
+│   │   ├── passwords_697237333.txt
+│   │   └── Resume_1691585374.txt
+│   ├── imp.png
+│   ├── main_menu.png
+│   ├── ModernDOS.ttf
+│   └── root.json
+├── shaders
+│   ├── text.frag
+│   ├── text.vert
+│   ├── ui.frag
+│   └── ui.vert
+├── terminal
+│   ├── lock
+│   │   ├── lock.odin
+│   │   └── saved_locks
+│   │       └── saved_locks.odin
+│   └── terminal.odin
+├── text
+│   └── text.odin
+├── tree.txt
+├── ui
+│   └── ui.odin
+├── util
+│   └── util.odin
+└── virtual_fs
+    └── virtual_fs.odin
+
+22 directories, 32 files
