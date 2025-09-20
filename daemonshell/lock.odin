@@ -1,7 +1,7 @@
-package lock
+#+feature dynamic-literals
+package daemonshell
 
-import _t "../../text"
-import _vfs "../../virtual_fs"
+import tr "../text_render"
 import "core:thread"
 import "core:time"
 import "core:strings"
@@ -11,25 +11,21 @@ import lin "core:math/linalg/glsl"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 
-GREY :: [?]f32{0.7,0.7,0.7}
-GREEN :: [?]f32{0.5,1.0,0.5}
-RED :: [?]f32{1.0,0.5,0.5}
-
 Lock_Config :: struct {
         hint, answer: string,
         shader, tex: u32,
-        chars: [128]_t.Character,
+        chars: [128]tr.Character,
         width, height: ^f32
 }
 
 Lock :: struct {
-        node: ^_vfs.Node,
+        node: ^Node,
         shader, VAO, VBO, tex: u32,
         width, height: ^f32,
         hint, answer, input: string,
         active, should_close: bool,
         cursor: int,
-        chars: [128]_t.Character,
+        chars: [128]tr.Character,
         input_color: [3]f32,
         vecs: [dynamic]f32,
 }
@@ -38,7 +34,7 @@ Lock_Info :: struct {
         hint, answer: string,
 }
 
-init_lock :: proc(config: Lock_Config, node: ^_vfs.Node) -> ^Lock {
+init_lock :: proc(config: Lock_Config, node: ^Node) -> ^Lock {
         lock := new(Lock)
         lock.node = node
         lock.answer = config.answer
@@ -57,12 +53,12 @@ init_lock :: proc(config: Lock_Config, node: ^_vfs.Node) -> ^Lock {
         return lock
 }
 
-update :: proc(lock: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
+update_lock :: proc(lock: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         lock := cast(^Lock)lock
         if !lock.active {
                 glfw.SetWindowUserPointer(window, lock);
-                glfw.SetCharCallback(window, char_callback);
-                glfw.SetKeyCallback(window, key_callback)
+                glfw.SetCharCallback(window, char_callback_lock);
+                glfw.SetKeyCallback(window, key_callback_lock)
                 glfw.SetScrollCallback(window, nil);
                 lock.active = true;
         }
@@ -71,9 +67,9 @@ update :: proc(lock: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         ortho: matrix[4,4]f32 = lin.mat4Ortho3d(0, lock.width^, 0, lock.height^, -1.0, 10.0);
         gl.UniformMatrix4fv(gl.GetUniformLocation(lock.shader, "projection"), 1, gl.FALSE, &ortho[0, 0]);
         clear(&lock.vecs)
-        _t.wrap_and_push(lock.hint, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.7, lock.width^*0.6, 30, GREY)
-        _t.wrap_and_push(lock.input, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.3, lock.width^*0.6, 30, lock.input_color)
-        _t.render(lock.vecs, lock.tex, lock.VAO, lock.VBO)
+        tr.wrap_and_push(lock.hint, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.7, lock.width^*0.6, 30, GREY)
+        tr.wrap_and_push(lock.input, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.3, lock.width^*0.6, 30, lock.input_color)
+        tr.render(lock.vecs, lock.tex, lock.VAO, lock.VBO)
         if lock.should_close {
                 return 1
         }
@@ -81,18 +77,18 @@ update :: proc(lock: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
 }
 
 // TODO center the text
-render :: proc(lock: ^Lock) {
+render_lock :: proc(lock: ^Lock) {
         gl.UseProgram(lock.shader)
         gl.BindTexture(gl.TEXTURE_2D, lock.tex)
         ortho: matrix[4,4]f32 = lin.mat4Ortho3d(0, lock.width^, 0, lock.height^, -1.0, 10.0);
         gl.UniformMatrix4fv(gl.GetUniformLocation(lock.shader, "projection"), 1, gl.FALSE, &ortho[0, 0]);
         clear(&lock.vecs)
-        _t.wrap_and_push(lock.answer, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.7, lock.width^*0.6, 30, GREY)
-        _t.wrap_and_push(lock.answer, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.3, lock.width^*0.6, 30, lock.input_color)
-        _t.render(lock.vecs, lock.tex, lock.VAO, lock.VBO)
+        tr.wrap_and_push(lock.answer, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.7, lock.width^*0.6, 30, GREY)
+        tr.wrap_and_push(lock.answer, &lock.vecs, lock.chars, lock.width^*0.2, lock.height^*0.3, lock.width^*0.6, 30, lock.input_color)
+        tr.render(lock.vecs, lock.tex, lock.VAO, lock.VBO)
 }
 
-char_callback :: proc "c" (window: glfw.WindowHandle, code: rune) {
+char_callback_lock :: proc "c" (window: glfw.WindowHandle, code: rune) {
         lock: ^Lock = cast(^Lock)glfw.GetWindowUserPointer(window)
         context = runtime.default_context()
         bldr := strings.Builder{}
@@ -106,7 +102,7 @@ char_callback :: proc "c" (window: glfw.WindowHandle, code: rune) {
         lock.cursor += 1
 }
 
-key_callback :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, action: i32, mods: i32) {
+key_callback_lock :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, action: i32, mods: i32) {
         lock: ^Lock = cast(^Lock)glfw.GetWindowUserPointer(window)
         context = runtime.default_context()
         if action != glfw.PRESS && action != glfw.REPEAT {
@@ -117,10 +113,10 @@ key_callback :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, ac
                         // TODO locks opened saved
                         if (lock.input == lock.answer) {
                                 lock.input_color = GREEN
-                                delay_close(lock, 1000000000);
+                                delay_close_lock(lock, 1000000000);
                         } else {
                                 lock.input_color = RED
-                                delay_color_change(lock, GREY, 1000000000);
+                                delay_color_change_lock(lock, GREY, 1000000000);
                         }
                 }
                 case glfw.KEY_BACKSPACE: {
@@ -147,7 +143,7 @@ key_callback :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, ac
 }
 
 // TODO ask about this
-delay_close :: proc(lock: ^Lock, ms: int) {
+delay_close_lock :: proc(lock: ^Lock, ms: int) {
         Data :: struct {
                 lock: ^Lock,
                 ms: int,
@@ -166,7 +162,7 @@ delay_close :: proc(lock: ^Lock, ms: int) {
         thread.start(t1)
 }
 
-delay_color_change :: proc(lock: ^Lock, color: [3]f32, ms: int) {
+delay_color_change_lock :: proc(lock: ^Lock, color: [3]f32, ms: int) {
         Data :: struct {
                 lock: ^Lock,
                 ms: int,
@@ -186,3 +182,11 @@ delay_color_change :: proc(lock: ^Lock, color: [3]f32, ms: int) {
         t1.data = data
         thread.start(t1)
 }
+
+// This is implicitly allocated. Doesn't matter in this case, but good to know!
+saved_locks := map[string]Lock_Info{
+        "Backup_755012715.lock" = {"brother in law", "Jacob"},
+        "Code_163903526.lock" = {"first BDOWDC champion", "Leighton Rees"},
+        "Logs_1807696380.lock" = {"my zodiac element + symbol", "metal dragon"},
+}
+        

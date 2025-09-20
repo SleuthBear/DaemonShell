@@ -5,7 +5,7 @@ import "core:os"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
-import _t "../text"
+import tr "../text_render"
 
 UI :: struct {
         width, height: ^f32,
@@ -13,7 +13,7 @@ UI :: struct {
         text_vecs: [dynamic]f32,
         shader, text_shader, VAO, VBO, atlas, tex: u32,
         layout: Layout,
-        chars: [128]_t.Character,
+        chars: [128]tr.Character,
         active: bool
 }
 
@@ -48,7 +48,7 @@ UI_Config :: struct {
         layout: Layout,
         width, height: ^f32,
         shader, text_shader, atlas, tex: u32,
-        chars: [128]_t.Character,        
+        chars: [128]tr.Character,        
         use_shader, use_text_shader: bool,
 }
 
@@ -64,13 +64,10 @@ init_ui :: proc(config: UI_Config) -> ^UI {
                 if !ok {
                         fmt.println("Failed to create ui shader")
                         os.exit(1)
-                } else {
-                        fmt.println("Created new shader")
-                }
+                } 
         }
         if config.text_shader > 0 {
                 ui.text_shader = config.text_shader
-                fmt.println("Using provided shader")
         } else {
                 ui.text_shader, ok = gl.load_shaders_file("../shaders/text.vert", "../shaders/text.frag")
                 if !ok {
@@ -117,7 +114,7 @@ render :: proc(ui: ^UI) {
         gl.UseProgram(ui.text_shader)
         gl.BindTexture(gl.TEXTURE_2D, ui.atlas)
         gl.UniformMatrix4fv(gl.GetUniformLocation(ui.text_shader, "projection"), 1, gl.FALSE, &ortho[0, 0]);
-        _t.render(ui.text_vecs, ui.atlas, ui.VAO, ui.VBO)
+        tr.render(ui.text_vecs, ui.atlas, ui.VAO, ui.VBO)
         // Clear the data
         for i in 0..<len(ui.layout.ys) {
                 ui.layout.ys[i] = 0
@@ -167,7 +164,7 @@ button :: proc(window: glfw.WindowHandle, ui: ^UI, text: string, row: int, col: 
         text_height := config.height-20-config.border_width*2
         text_left := left + config.border_width + 10
         text_top := top - config.border_width - 10
-        _t.wrap_center_and_push(text, &ui.text_vecs, ui.chars, text_left, text_top, text_width, text_height, config.text_color)
+        tr.wrap_center_and_push(text, &ui.text_vecs, ui.chars, text_left, text_top, text_width, text_height, config.text_color)
         
         ui.layout.ys[row*col+col] += config.height + 20
         if glfw.GetMouseButton(window, glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS {

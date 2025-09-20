@@ -1,4 +1,4 @@
-package virtual_fs
+package daemonshell
 
 import "core:encoding/json"
 import "core:os"

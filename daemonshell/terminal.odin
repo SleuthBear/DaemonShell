@@ -1,17 +1,9 @@
-package terminal 
+package daemonshell 
 
 import "core:fmt"
 import "core:os"
 import "base:runtime"
-import _t "../text"
-import _vfs "../virtual_fs"
-import _m "../menu"
-// todo consolidate
-import "../util"
-// todo consolidate
-import _l "lock"
-import _sl "lock/saved_locks"
-import _imp "../imp"
+import tr "../text_render"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
@@ -30,7 +22,7 @@ Terminal :: struct {
         vecs: [dynamic]f32,
         width, height: ^f32,
         cursor: int,
-        chars: [128]_t.Character,
+        chars: [128]tr.Character,
         lines: [MAX_LINES]Line,
         input: string,
         end, start, window: i32,
@@ -38,9 +30,9 @@ Terminal :: struct {
         tex: u32,
         shader: u32,
         vis_shader: u32,
-        node: ^_vfs.Node,
-        game_stack: ^queue.Queue(util.Layer),
-        imp: ^_imp.Imp,
+        node: ^Node,
+        game_stack: ^queue.Queue(Layer),
+        imp: ^Imp,
 }
 
 Line :: struct {
@@ -54,7 +46,7 @@ Side :: enum {
         USER,
 }
 
-init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u32, _game_stack: ^queue.Queue(util.Layer)) -> Terminal {
+init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u32, _game_stack: ^queue.Queue(Layer)) -> Terminal {
         
         term := Terminal{
                width = _width,
@@ -70,8 +62,8 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u3
         term.lines[1] = {"", WHITE, Side.USER}
         gl.GenVertexArrays(1, &term.VAO)
         gl.GenBuffers(1, &term.VBO)
-        _t.create_bitmap("../resources/ModernDOS.ttf", &term.tex, &term.chars)
-        term.node = _vfs.read_system("../resources/root.json")
+        tr.create_bitmap("resources/ModernDOS.ttf", &term.tex, &term.chars)
+        term.node = read_system("resources/root.json")
         return term 
 }
 
@@ -79,8 +71,8 @@ update :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         term := cast(^Terminal)term
         if !term.active {
                 glfw.SetWindowUserPointer(window, term)
-                glfw.SetCharCallback(window, char_callback)
-                glfw.SetKeyCallback(window, key_callback)
+                glfw.SetCharCallback(window, char_callback_terminal)
+                glfw.SetKeyCallback(window, key_callback_terminal)
                 glfw.SetScrollCallback(window, nil)
                 glfw.SetMouseButtonCallback(window, nil)
                 term.active = true
@@ -91,8 +83,8 @@ update :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         gl.UniformMatrix4fv(gl.GetUniformLocation(term.shader, "projection"), 1, gl.FALSE, &ortho[0, 0]);
         clear(&term.vecs)
         push_lines(term)
-        _t.render(term.vecs, term.tex, term.VAO, term.VBO)
-        _imp.update(term.imp, window, dt)
+        tr.render(term.vecs, term.tex, term.VAO, term.VBO)
+        update_imp(term.imp, window, dt)
         return 0 
 }
 
@@ -100,7 +92,7 @@ update :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
 push_lines :: proc(term: ^Terminal) {
         // todo calculate line height here and pass it
         line_height: f32 = 25
-        scale := _t.calc_char_scale(term.chars, line_height)
+        scale := tr.calc_char_scale(term.chars, line_height)
         printed_lines: int = 0
         for i: i32 = 0; printed_lines < int(term.height^ / line_height); i+=1 {
                 if i == -1 {
@@ -125,12 +117,12 @@ push_lines :: proc(term: ^Terminal) {
                                                 })
                         }
                 }
-                wraps := _t.wrap_lines(to_display, term.chars, term.width^-30, scale)
+                wraps := tr.wrap_lines(to_display, term.chars, term.width^-30, scale)
                 defer delete(wraps)
                 printed_lines += len(wraps)
                 // todo repace with line height 
                 line_y: f32 = f32(printed_lines) * line_height
-                _t.push_wrapped(to_display, &term.vecs, wraps, term.chars, 15, line_y, line_height, line.col)
+                tr.push_wrapped(to_display, &term.vecs, wraps, term.chars, 15, line_y, line_height, line.col)
                 if term.window-i == term.end {
                         break
                 }
@@ -162,7 +154,7 @@ add_line :: proc(term: ^Terminal, line: Line) {
 // Callback Functions
 // TODO this whole thing feels crappy. I get that the performance impact is negligible, but it's an unecessary allocation'
 // maybe just assign 1000 chars of capacity up front? Not sure how to do that with a backing array.
-char_callback :: proc "c" (window: glfw.WindowHandle, code: rune) {
+char_callback_terminal :: proc "c" (window: glfw.WindowHandle, code: rune) {
         term: ^Terminal = cast(^Terminal)glfw.GetWindowUserPointer(window)
         context = runtime.default_context()
         txt := term.lines[term.start].txt
@@ -178,7 +170,7 @@ char_callback :: proc "c" (window: glfw.WindowHandle, code: rune) {
         term.cursor += 1
 }
 
-key_callback :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, action: i32, mods: i32) {
+key_callback_terminal :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, action: i32, mods: i32) {
         term: ^Terminal = cast(^Terminal)glfw.GetWindowUserPointer(window)
         context = runtime.default_context()
         if action != glfw.PRESS && action != glfw.REPEAT {
@@ -186,8 +178,8 @@ key_callback :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i32, ac
         }
         switch key {
                 case glfw.KEY_ESCAPE: {
-                        pause_menu := _m.init_pause_menu(term.width, term.height, term.shader, term.vis_shader, term.chars, term.tex)
-                        queue.push_back(term.game_stack, util.Layer{pause_menu, _m.update_pause_menu})
+                        pause_menu := init_pause_menu(term.width, term.height, term.shader, term.vis_shader, term.chars, term.tex)
+                        queue.push_back(term.game_stack, Layer{pause_menu, update_pause_menu})
                 }
                 case glfw.KEY_ENTER: {
                         line_txt := term.lines[term.start].txt
@@ -236,7 +228,7 @@ auto_complete :: proc(term: ^Terminal) {
         for i>=0 && to_complete[i] != '/' {
                 i-=1
         }
-        pos: ^_vfs.Node = _vfs.follow_path(term.node, to_complete[:i+1])
+        pos: ^Node = follow_path(term.node, to_complete[:i+1])
         if pos == nil {
                 return
         }
@@ -282,7 +274,7 @@ read_command :: proc(term: ^Terminal, command: string) {
         if dialogue[file_ref] != nil {
                 for option in dialogue[file_ref] {
                         if command == option[0] {
-                                _imp.add_text(term.imp, option[1])
+                                add_text_imp(term.imp, option[1])
                         }
                 }
         }
@@ -319,7 +311,7 @@ read_command :: proc(term: ^Terminal, command: string) {
 }
 
 ls :: proc(term: ^Terminal, path: string) {
-        node: ^_vfs.Node = _vfs.follow_path(term.node, path)
+        node: ^Node = follow_path(term.node, path)
         if node == nil {
                 // note to self: strings.clone ensures heap allocation. Otherwise it can be overwritten and deleting causes issues
                 add_line(term, {strings.clone("Invalid path."), RED, Side.SYS})
@@ -338,14 +330,14 @@ ls :: proc(term: ^Terminal, path: string) {
 }
 
 cd :: proc(term: ^Terminal, path: string) {
-        node: ^_vfs.Node = _vfs.follow_path(term.node, path)
+        node: ^Node = follow_path(term.node, path)
         if node == nil {
                 add_line(term, {strings.clone("Invalid path."), RED, Side.SYS})
                 return
         }
         if strings.contains(node.name, ".lock") {
-                info := _sl.locks[node.file_ref]
-                config := _l.Lock_Config{
+                info := saved_locks[node.file_ref]
+                config := Lock_Config{
                         hint = info.hint,
                         answer = info.answer,
                         shader = term.shader,
@@ -354,26 +346,26 @@ cd :: proc(term: ^Terminal, path: string) {
                         width = term.width,
                         height = term.height,
                 }
-                lock := _l.init_lock(config, node)
-                queue.push_back(term.game_stack, util.Layer{lock, _l.update}) 
+                lock := init_lock(config, node)
+                queue.push_back(term.game_stack, Layer{lock, update_lock}) 
                 term.active = false
         }
         if term.imp.dialogue[node.file_ref] != nil {
                 to_say := term.imp.dialogue[node.file_ref][0][1]
                 if to_say != "" {
-                        _imp.add_text(term.imp, to_say)
+                        add_text_imp(term.imp, to_say)
                 }
         }
         term.node = node
 }
 
 cat :: proc(term: ^Terminal, path: string) {
-        pos: ^_vfs.Node = _vfs.follow_path(term.node, path)
+        pos: ^Node = follow_path(term.node, path)
         if pos == nil {
                 add_line(term, {strings.clone("Invalid path."), RED, Side.SYS})
                 return
         }
-        if pos.type != _vfs.File_Type.FILE {
+        if pos.type != File_Type.FILE {
                 add_line(term, {strings.clone("Not a file."), RED, Side.SYS})
                 return
         }

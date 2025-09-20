@@ -1,4 +1,4 @@
-package util
+package daemonshell
 
 import "vendor:glfw"
 import gl "vendor:OpenGL"
@@ -41,6 +41,6 @@ load_texture :: proc(path: string) -> u32 {
                 gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 return tex_id
         }
-        fmt.println("Failed to load texture")
+        fmt.println("Failed to load texture", path)
         return 0
 }

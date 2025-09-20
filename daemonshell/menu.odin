@@ -1,13 +1,12 @@
-package menu
+package daemonshell
 
 import "../ui"
-import _t "../text"
+import tr "../text_render"
 import "core:strings"
 import "vendor:glfw"
 import "vendor:stb/image"
-import "../util"
 
-init_main_menu :: proc(_width: ^f32, _height: ^f32, _text_shader: u32, _shader: u32, _chars: [128]_t.Character, _atlas: u32) -> ^ui.UI {
+init_main_menu :: proc(_width: ^f32, _height: ^f32, _text_shader: u32, _shader: u32, _chars: [128]tr.Character, _atlas: u32) -> ^ui.UI {
         layout := ui.Layout{
                 row = 4,
                 col = 1
@@ -22,7 +21,7 @@ init_main_menu :: proc(_width: ^f32, _height: ^f32, _text_shader: u32, _shader: 
                 use_shader = true,
                 chars = _chars,
                 atlas = _atlas,
-                tex = util.load_texture("../resources/main_menu.png"),
+                tex = load_texture("resources/main_menu.png"),
         }
         return ui.init_ui(ui_config)
 }
@@ -66,7 +65,7 @@ update_main_menu :: proc(menu: rawptr, window: glfw.WindowHandle, dt: f64) -> in
         return 0 
 }
 
-init_pause_menu :: proc(_width: ^f32, _height: ^f32, _text_shader: u32, _shader: u32, _chars: [128]_t.Character, _atlas: u32) -> ^ui.UI {
+init_pause_menu :: proc(_width: ^f32, _height: ^f32, _text_shader: u32, _shader: u32, _chars: [128]tr.Character, _atlas: u32) -> ^ui.UI {
         layout := ui.Layout{
                 row = 4,
                 col = 1

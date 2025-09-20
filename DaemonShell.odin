@@ -7,13 +7,9 @@ import "core:container/queue"
 import "core:time"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
-import _t "text"
-import _tml "terminal"
-import _lck "terminal/lock"
-import _m "menu"
-import _imp "imp"
+import ds "daemonshell"
+import tr "text_render"
 import "ui"
-import "util"
 
 GL_MAJOR_VERSION : c.int : 3
 GL_MINOR_VERSION :: 3
@@ -47,29 +43,29 @@ main :: proc() {
         glfw.SetWindowSizeCallback(window, window_size_callback)
 
         // Create required game objects
-        game_stack: queue.Queue(util.Layer)
+        game_stack: queue.Queue(ds.Layer)
         queue.init(&game_stack)
 
-        text_shader, text_shade_ok := gl.load_shaders_file("../shaders/text.vert", "../shaders/text.frag")
+        text_shader, text_shade_ok := gl.load_shaders_file("shaders/text.vert", "shaders/text.frag")
         if !text_shade_ok {
                 fmt.println("Failed to create text")
                 os.exit(1)
         }
         // TODO the if statement in this shader is slow. If we removed it we could have better performance with
         // Only 1 more draw call. 
-        shader, shader_ok := gl.load_shaders_file("../shaders/ui.vert", "../shaders/ui.frag")
+        shader, shader_ok := gl.load_shaders_file("shaders/ui.vert", "shaders/ui.frag")
         if !shader_ok {
                 fmt.println("Failed to create shader")
                 os.exit(1)
         }
 
-        terminal := _tml.init_terminal(&WIDTH, &HEIGHT, text_shader, shader, &game_stack)
-        queue.push_back(&game_stack, util.Layer{&terminal, _tml.update})
+        terminal := ds.init_terminal(&WIDTH, &HEIGHT, text_shader, shader, &game_stack)
+        queue.push_back(&game_stack, ds.Layer{&terminal, ds.update})
         
-        main_menu := _m.init_main_menu(&WIDTH, &HEIGHT, text_shader, shader, terminal.chars, terminal.tex)
-        queue.push_back(&game_stack, util.Layer{main_menu, _m.update_main_menu})
+        main_menu := ds.init_main_menu(&WIDTH, &HEIGHT, text_shader, shader, terminal.chars, terminal.tex)
+        queue.push_back(&game_stack, ds.Layer{main_menu, ds.update_main_menu})
 
-        imp := _imp.init_imp(shader, text_shader, terminal.tex, terminal.chars, &WIDTH, &HEIGHT)
+        imp := ds.init_imp(shader, text_shader, terminal.tex, terminal.chars, &WIDTH, &HEIGHT)
         terminal.imp = imp
 
         
@@ -89,7 +85,7 @@ main :: proc() {
 
 
                 // This will use the current shader, so it must be set outside the render context. WITH the texture map.
-                layer: util.Layer = queue.back(&game_stack)
+                layer: ds.Layer = queue.back(&game_stack)
                 if layer.update(layer.state, window, dt) == 1 {
                         queue.pop_back(&game_stack)
                 }

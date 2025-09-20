@@ -1,4 +1,4 @@
-package text
+package text_render
 
 import "core:c/libc"
 import "core:fmt"

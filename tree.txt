@@ -1,24 +1,9 @@
 .
-├── build
-│   ├── bitmap.jpg
-│   ├── debug.exe
-│   └── debug.exe.dSYM
-│       └── Contents
-│           ├── Info.plist
-│           └── Resources
-│               ├── DWARF
-│               │   └── debug.exe
-│               └── Relocations
-│                   └── aarch64
-│                       └── debug.exe.yml
 ├── DaemonShell.odin
 ├── imp
-│   └── imp.odin
 ├── include
 │   └── freetype
 │       └── freetype.odin
-├── menu
-│   └── menu.odin
 ├── resources
 │   ├── bitmap.jpg
 │   ├── dialogue.json
@@ -37,20 +22,17 @@
 │   ├── text.vert
 │   ├── ui.frag
 │   └── ui.vert
-├── terminal
-│   ├── lock
-│   │   ├── lock.odin
-│   │   └── saved_locks
-│   │       └── saved_locks.odin
-│   └── terminal.odin
-├── text
-│   └── text.odin
-├── tree.txt
-├── ui
-│   └── ui.odin
-├── util
-│   └── util.odin
-└── virtual_fs
-    └── virtual_fs.odin
+├── src
+│   ├── imp.odin
+│   ├── lock.odin
+│   ├── menu.odin
+│   ├── terminal.odin
+│   ├── text_render
+│   │   └── text.odin
+│   ├── ui
+│   │   └── ui.odin
+│   ├── util.odin
+│   └── virtual_fs.odin
+└── tree.txt
 
-22 directories, 32 files
+17 directories, 31 files

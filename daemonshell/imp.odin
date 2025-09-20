@@ -1,7 +1,6 @@
-package imp
+package daemonshell
 
-import _t "../text"
-import "../util"
+import tr "../text_render"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
@@ -21,7 +20,7 @@ Imp :: struct {
         time_to_speak: f64,
         chars_to_print: f64,
         col: [3]f32,
-        chars: [128]_t.Character,
+        chars: [128]tr.Character,
         active: bool,
         vecs: [dynamic]f32,
         text_vecs: [dynamic]f32,
@@ -36,7 +35,7 @@ frames := [5][2]f32{
         {0.625, 0.500},
 }
 
-init_imp :: proc(shader, text_shader, atlas: u32, chars: [128]_t.Character, screen_width, screen_height: ^f32) -> ^Imp {
+init_imp :: proc(shader, text_shader, atlas: u32, chars: [128]tr.Character, screen_width, screen_height: ^f32) -> ^Imp {
         imp := new(Imp)
         imp.shader = shader
         imp.text_shader = text_shader
@@ -46,27 +45,27 @@ init_imp :: proc(shader, text_shader, atlas: u32, chars: [128]_t.Character, scre
         imp.vecs = make([dynamic]f32)
         imp.text_vecs = make([dynamic]f32)
         imp.active = true
-        imp.tex = util.load_texture("../resources/imp.png")
+        imp.tex = load_texture("resources/imp.png")
         imp.col = {1.0, 0.5, 0.5}
         imp.chars = chars
         gl.GenVertexArrays(1, &imp.VAO)
         gl.GenBuffers(1, &imp.VBO)
-        get_dialogue(&imp.dialogue, "../resources/dialogue.json")
+        get_dialogue(&imp.dialogue, "resources/dialogue.json")
         return imp
 }
 
-update :: proc(imp: ^Imp, window: glfw.WindowHandle, dt: f64) -> int {
+update_imp :: proc(imp: ^Imp, window: glfw.WindowHandle, dt: f64) -> int {
         // todo add delta time to update call
         imp.time += dt
         imp.time_to_speak -= dt
         if int(imp.chars_to_print) < len(imp.text) {
                 imp.chars_to_print += dt*chars_per_second
         }
-        render(imp)
+        render_imp(imp)
         return 0
 }
  
-render :: proc(imp: ^Imp) {
+render_imp :: proc(imp: ^Imp) {
         scale: f32 = 140.0
         x: f32 = imp.screen_width^*0.80
         y: f32 = imp.screen_height^
@@ -82,11 +81,10 @@ render :: proc(imp: ^Imp) {
         )
         if imp.time_to_speak > 0 {
                 line_height: f32 = 25
-                char_scale := _t.calc_char_scale(imp.chars, line_height)
-                wraps := _t.wrap_lines(imp.text, imp.chars, 1.5*scale-20, char_scale)
+                char_scale := tr.calc_char_scale(imp.chars, line_height)
+                wraps := tr.wrap_lines(imp.text, imp.chars, 1.5*scale-20, char_scale)
                 defer delete(wraps) 
                 sub_wraps := make([dynamic]u32)
-                fmt.println(len(sub_wraps))
                 defer delete(sub_wraps)
                 counter: f64 = 0
                 for wrap in wraps {
@@ -112,7 +110,7 @@ render :: proc(imp: ^Imp) {
                         x,              y-0.45*scale,           0.1,  1.0, 1.0, 1.0,  -1, -1,
                         x,              y-0.35*scale,           0.1,  1.0, 1.0, 1.0,  -1, -1,
                 )
-                _t.push_wrapped(imp.text[:int(imp.chars_to_print)], &imp.text_vecs, sub_wraps, imp.chars, x-1.5*scale+10, y-0.3*scale-10, line_height, {0,0.0,0})
+                tr.push_wrapped(imp.text[:int(imp.chars_to_print)], &imp.text_vecs, sub_wraps, imp.chars, x-1.5*scale+10, y-0.3*scale-10, line_height, {0,0.0,0})
         }
         
         gl.UseProgram(imp.shader)
@@ -133,7 +131,7 @@ render :: proc(imp: ^Imp) {
         gl.UseProgram(imp.text_shader)
         gl.BindTexture(gl.TEXTURE_2D, imp.atlas)
         gl.UniformMatrix4fv(gl.GetUniformLocation(imp.text_shader, "projection"), 1, gl.FALSE, &ortho[0, 0]);
-        _t.render(imp.text_vecs, imp.atlas, imp.VAO, imp.VBO)
+        tr.render(imp.text_vecs, imp.atlas, imp.VAO, imp.VBO)
         // Clear the data
         clear(&imp.vecs)
         clear(&imp.text_vecs)
@@ -161,13 +159,12 @@ get_dialogue :: proc(dialogue: ^map[string]([dynamic][2]string), path: string) {
                         options := option.(json.Object)
                         append(&dialogue[obj["file_ref"].(json.String)], 
                         [2]string{options["input"].(json.String), options["response"].(json.String)})
-                        fmt.println(dialogue[obj["file_ref"].(json.String)],)
                 }
         }
 
 }
 
-add_text :: proc(imp: ^Imp, text: string) {
+add_text_imp :: proc(imp: ^Imp, text: string) {
         imp.chars_to_print = 0
         imp.text = text
         imp.time_to_speak = f64(len(text)) / chars_per_second + 5.0
