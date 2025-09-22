@@ -11,6 +11,7 @@ import "core:os"
 Layer :: struct {
         state: rawptr,
         update: proc(rawptr, glfw.WindowHandle, f64) -> int,
+        cleanup: proc(rawptr),
 }
 
 load_texture :: proc(path: string) -> u32 {

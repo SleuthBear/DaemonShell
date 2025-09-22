@@ -8,7 +8,7 @@
             "name": "Debug",
             "program": "${workspaceFolder}/build/debug.exe",
             "args": [],
-            "cwd": "${workspaceFolder}/build"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

@@ -41,6 +41,7 @@ main :: proc() {
         gl.Enable(gl.BLEND)
         gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
         glfw.SetWindowSizeCallback(window, window_size_callback)
+        glfw.SetFramebufferSizeCallback(window, frame_buffer_callback)
 
         // Create required game objects
         game_stack: queue.Queue(ds.Layer)
@@ -60,10 +61,10 @@ main :: proc() {
         }
 
         terminal := ds.init_terminal(&WIDTH, &HEIGHT, text_shader, shader, &game_stack)
-        queue.push_back(&game_stack, ds.Layer{&terminal, ds.update})
+        queue.push_back(&game_stack, ds.Layer{&terminal, ds.update_terminal, ds.cleanup_terminal})
         
-        main_menu := ds.init_main_menu(&WIDTH, &HEIGHT, text_shader, shader, terminal.chars, terminal.tex)
-        queue.push_back(&game_stack, ds.Layer{main_menu, ds.update_main_menu})
+        main_menu := ds.init_main_menu(&WIDTH, &HEIGHT, text_shader, shader, terminal.chars, terminal.tex, &terminal)
+        queue.push_back(&game_stack, ds.Layer{main_menu, ds.update_main_menu, ds.cleanup_main_menu})
 
         imp := ds.init_imp(shader, text_shader, terminal.tex, terminal.chars, &WIDTH, &HEIGHT)
         terminal.imp = imp
@@ -87,6 +88,7 @@ main :: proc() {
                 // This will use the current shader, so it must be set outside the render context. WITH the texture map.
                 layer: ds.Layer = queue.back(&game_stack)
                 if layer.update(layer.state, window, dt) == 1 {
+                        layer.cleanup(layer.state)
                         queue.pop_back(&game_stack)
                 }
 
@@ -96,6 +98,11 @@ main :: proc() {
 }
 
 window_size_callback :: proc "c" (window: glfw.WindowHandle, width: i32, height: i32) {
-    WIDTH = f32(width)
-    HEIGHT = f32(height)
+        WIDTH = f32(width)
+        HEIGHT = f32(height)
+}
+
+frame_buffer_callback :: proc "c" (window: glfw.WindowHandle, width: i32, height: i32) {
+        WIDTH = f32(width)
+        HEIGHT = f32(height)   
 }

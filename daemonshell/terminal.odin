@@ -5,12 +5,15 @@ import "core:os"
 import "base:runtime"
 import tr "../text_render"
 import gl "vendor:OpenGL"
+import "core:slice"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
 import "core:strings"
 import "core:container/queue"
 
 MAX_LINES :: 200
+MAX_COMMANDS :: 5
+TERMINAL_LINE_HEIGHT : f64 : 25
 RED :: [?]f32{1.0, 0.5, 0.5}
 WHITE :: [?]f32{1.0,1.0,1.0}
 GREY :: [?]f32{0.7,0.7,0.7}
@@ -24,8 +27,10 @@ Terminal :: struct {
         cursor: int,
         chars: [128]tr.Character,
         lines: [MAX_LINES]Line,
+        command_buffer: [MAX_COMMANDS]Line,
+        at_command, viewing_command: u32,
         input: string,
-        end, start, window: i32,
+        end, start, window: int,
         active: bool,
         tex: u32,
         shader: u32,
@@ -47,7 +52,6 @@ Side :: enum {
 }
 
 init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u32, _game_stack: ^queue.Queue(Layer)) -> Terminal {
-        
         term := Terminal{
                width = _width,
                height = _height,
@@ -59,15 +63,19 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u3
                vis_shader = _vis_shader,
                game_stack = _game_stack,
         }
-        term.lines[1] = {"", WHITE, Side.USER}
+        // Initial allocation required for command buffer
+        for i in 0..<MAX_COMMANDS {
+                term.lines[i+1] = {"", WHITE, Side.USER}
+                term.command_buffer[i] = term.lines[i+1]
+        }
         gl.GenVertexArrays(1, &term.VAO)
         gl.GenBuffers(1, &term.VBO)
-        tr.create_bitmap("resources/ModernDOS.ttf", &term.tex, &term.chars)
+        tr.create_bitmap("resources/MonaspaceKrypton-SemiBold.otf", &term.tex, &term.chars)
         term.node = read_system("resources/root.json")
         return term 
 }
 
-update :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
+update_terminal :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         term := cast(^Terminal)term
         if !term.active {
                 glfw.SetWindowUserPointer(window, term)
@@ -88,13 +96,19 @@ update :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int {
         return 0 
 }
 
+cleanup_terminal :: proc(term: rawptr) {
+        term := cast(^Terminal)term
+        delete(term.vecs)
+        free(term)
+}
+
 //todo add dynamic text scale
 push_lines :: proc(term: ^Terminal) {
         // todo calculate line height here and pass it
-        line_height: f32 = 25
+        line_height: f32 = f32(TERMINAL_LINE_HEIGHT)
         scale := tr.calc_char_scale(term.chars, line_height)
         printed_lines: int = 0
-        for i: i32 = 0; printed_lines < int(term.height^ / line_height); i+=1 {
+        for i: int = 0; printed_lines < int(term.height^ / line_height); i+=1 {
                 if i == -1 {
                         i = MAX_LINES - 1
                 }
@@ -131,7 +145,6 @@ push_lines :: proc(term: ^Terminal) {
 
 add_line :: proc(term: ^Terminal, line: Line) {
         // if end != start then buffer hasn't been filled.
-        // todo lookback buffer
         if (term.end != term.start) {
                 if (term.start == MAX_LINES - 1) {
                         term.start = 0
@@ -178,14 +191,15 @@ key_callback_terminal :: proc "c" (window: glfw.WindowHandle, key: i32, scancode
         }
         switch key {
                 case glfw.KEY_ESCAPE: {
-                        pause_menu := init_pause_menu(term.width, term.height, term.shader, term.vis_shader, term.chars, term.tex)
-                        queue.push_back(term.game_stack, Layer{pause_menu, update_pause_menu})
+                        pause_menu := init_pause_menu(term.width, term.height, term.shader, term.vis_shader, term.chars, term.tex, term.node)
+                        queue.push_back(term.game_stack, Layer{pause_menu, update_pause_menu, cleanup_pause_menu})
                 }
                 case glfw.KEY_ENTER: {
                         line_txt := term.lines[term.start].txt
                         if (len(line_txt) > 0) {
                                 term.cursor = 0;
                                 read_command(term, line_txt)
+                                
                                 add_line(term, {"", WHITE, Side.USER});
                         }
                 }
@@ -201,6 +215,19 @@ key_callback_terminal :: proc "c" (window: glfw.WindowHandle, key: i32, scancode
                                 delete(txt)
                                 term.lines[term.start].txt = strings.to_string(bldr)
                                 term.cursor -= 1
+                        }
+                }
+                case glfw.KEY_UP: {
+                        for line in term.command_buffer {
+                                fmt.println(line.txt)
+                        }
+                        delete(term.lines[term.start].txt)
+                        term.lines[term.start].txt = strings.clone(term.command_buffer[term.viewing_command].txt)
+                        term.cursor = len(term.lines[term.start].txt)
+                        if term.viewing_command == 0 {
+                                term.viewing_command = MAX_COMMANDS-1
+                        } else {
+                                term.viewing_command -= 1
                         }
                 }
                 case glfw.KEY_LEFT: {
@@ -269,6 +296,14 @@ auto_complete :: proc(term: ^Terminal) {
 }
 
 read_command :: proc(term: ^Terminal, command: string) {
+        if term.at_command == MAX_COMMANDS-1 {
+                term.at_command = 0
+        } else {
+                term.at_command += 1
+        }
+        delete(term.command_buffer[term.at_command].txt)
+        term.command_buffer[term.at_command].txt = strings.clone(term.lines[term.start].txt)
+        term.viewing_command = term.at_command
         file_ref := term.node.file_ref
         dialogue := term.imp.dialogue
         if dialogue[file_ref] != nil {
@@ -278,7 +313,11 @@ read_command :: proc(term: ^Terminal, command: string) {
                         }
                 }
         }
-        args := strings.split(command, " ");
+
+        splits := strings.split(command, " ")
+        defer delete(splits)
+        args := slice.filter(splits, proc(arg: string) -> bool {return arg != ""})
+        defer delete(args)
         defer delete(args)
         // TODO dialogue
         if len(args) == 0 {
@@ -347,7 +386,7 @@ cd :: proc(term: ^Terminal, path: string) {
                         height = term.height,
                 }
                 lock := init_lock(config, node)
-                queue.push_back(term.game_stack, Layer{lock, update_lock}) 
+                queue.push_back(term.game_stack, Layer{lock, update_lock, cleanup_lock}) 
                 term.active = false
         }
         if term.imp.dialogue[node.file_ref] != nil {
@@ -360,6 +399,7 @@ cd :: proc(term: ^Terminal, path: string) {
 }
 
 cat :: proc(term: ^Terminal, path: string) {
+
         pos: ^Node = follow_path(term.node, path)
         if pos == nil {
                 add_line(term, {strings.clone("Invalid path."), RED, Side.SYS})
@@ -369,7 +409,8 @@ cat :: proc(term: ^Terminal, path: string) {
                 add_line(term, {strings.clone("Not a file."), RED, Side.SYS})
                 return
         }
-        file_path := strings.concatenate({"files/", pos.file_ref})
+        file_path := strings.concatenate({"resources/files/", pos.file_ref})
+        fmt.println(file_path)
         defer delete(file_path)
         file_contents, ok := os.read_entire_file_from_filename(file_path)
         builder := strings.Builder{}

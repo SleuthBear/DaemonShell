@@ -183,6 +183,12 @@ delay_color_change_lock :: proc(lock: ^Lock, color: [3]f32, ms: int) {
         thread.start(t1)
 }
 
+cleanup_lock :: proc(lock: rawptr) {
+        lock := cast(^Lock)lock
+        delete(lock.vecs)
+        free(lock)
+}
+
 // This is implicitly allocated. Doesn't matter in this case, but good to know!
 saved_locks := map[string]Lock_Info{
         "Backup_755012715.lock" = {"brother in law", "Jacob"},
@@ -190,3 +196,4 @@ saved_locks := map[string]Lock_Info{
         "Logs_1807696380.lock" = {"my zodiac element + symbol", "metal dragon"},
 }
         
+locks_opened := map[string]bool {}

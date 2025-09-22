@@ -188,3 +188,15 @@ image :: proc(ui: ^UI, x, y: f32, config: Image_Config) {
                         x,                   y-config.height,        -0.1, config.color.x, config.color.y, config.color.z,     config.uv_top_left.x,      config.uv_bottom_right.y,
                 )
 }
+
+update_layout :: proc(ui: ^UI) {
+        ui.layout.row_height = ui.height^ / f32(ui.layout.row)
+        ui.layout.col_width = ui.width^ / f32(ui.layout.col)
+        ui.layout.ys = make([]f32, ui.layout.row * ui.layout.col)
+}
+
+cleanup :: proc(ui: ^UI) {
+        delete(ui.vecs)
+        delete(ui.text_vecs)
+        free(ui)
+}
