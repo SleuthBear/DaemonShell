@@ -5,6 +5,7 @@ import "core:os"
 import "base:runtime"
 import tr "../text_render"
 import gl "vendor:OpenGL"
+import "core:bufio"
 import "core:slice"
 import "vendor:glfw"
 import lin "core:math/linalg/glsl"
@@ -31,6 +32,7 @@ Terminal :: struct {
         at_command, viewing_command: u32,
         input: string,
         end, start, window: int,
+        window_frac: f64,
         active: bool,
         tex: u32,
         shader: u32,
@@ -59,6 +61,7 @@ init_terminal :: proc(_width: ^f32, _height: ^f32, _shader: u32, _vis_shader: u3
                end = 0,
                start = 1,
                window = 1,
+               window_frac = 0,
                shader = _shader,
                vis_shader = _vis_shader,
                game_stack = _game_stack,
@@ -81,7 +84,7 @@ update_terminal :: proc(term: rawptr, window: glfw.WindowHandle, dt: f64) -> int
                 glfw.SetWindowUserPointer(window, term)
                 glfw.SetCharCallback(window, char_callback_terminal)
                 glfw.SetKeyCallback(window, key_callback_terminal)
-                glfw.SetScrollCallback(window, nil)
+                glfw.SetScrollCallback(window, scroll_callback_terminal)
                 glfw.SetMouseButtonCallback(window, nil)
                 term.active = true
         }
@@ -108,11 +111,14 @@ push_lines :: proc(term: ^Terminal) {
         line_height: f32 = f32(TERMINAL_LINE_HEIGHT)
         scale := tr.calc_char_scale(term.chars, line_height)
         printed_lines: int = 0
-        for i: int = 0; printed_lines < int(term.height^ / line_height); i+=1 {
-                if i == -1 {
-                        i = MAX_LINES - 1
+        for at_line: int = term.window; printed_lines < int(term.height^ / line_height); {
+                if at_line == -1 {
+                        at_line = MAX_LINES-1
                 }
-                line := term.lines[term.window-i]
+                if at_line == term.end {
+                        return
+                }
+                line := term.lines[at_line]
                 to_display: string;
                 defer delete(to_display)
                 if (line.side == Side.USER) {
@@ -120,7 +126,7 @@ push_lines :: proc(term: ^Terminal) {
                 } else {
                         to_display = strings.clone(line.txt)
                 }
-                if (term.window-i == term.start) {
+                if (at_line== term.start) {
                         if (len(to_display) < int(term.cursor+2)) {
                                 to_display = strings.concatenate({to_display, "|"})
                         } else {
@@ -133,19 +139,26 @@ push_lines :: proc(term: ^Terminal) {
                 }
                 wraps := tr.wrap_lines(to_display, term.chars, term.width^-30, scale)
                 defer delete(wraps)
-                printed_lines += len(wraps)
+                // If we only see part of the line, then make sure that is reflected.
+                // todo convert wraps to slice in push wrapped
+                viewable_lines: int
+                if at_line == term.window {
+                        viewable_lines = int(f64(len(wraps))*(1-term.window_frac))
+                } else {
+                        viewable_lines = len(wraps)
+                }
+                printed_lines += viewable_lines
                 // todo repace with line height 
                 line_y: f32 = f32(printed_lines) * line_height
-                tr.push_wrapped(to_display, &term.vecs, wraps, term.chars, 15, line_y, line_height, line.col)
-                if term.window-i == term.end {
-                        break
-                }
+                tr.push_wrapped(to_display, &term.vecs, wraps[:viewable_lines], term.chars, 15, line_y, line_height, line.col)
+                at_line -= 1
         }
 }
 
 add_line :: proc(term: ^Terminal, line: Line) {
-        // if end != start then buffer hasn't been filled.
-        if (term.end != term.start) {
+        // if buffer hasn't been filled
+        if (term.end != (term.start+1) % MAX_LINES) {
+                // this branch should never trigger
                 if (term.start == MAX_LINES - 1) {
                         term.start = 0
                         delete(term.lines[term.start].txt)
@@ -156,12 +169,13 @@ add_line :: proc(term: ^Terminal, line: Line) {
                         term.lines[term.start] = line
                 }
         } else {
-                term.start += 1
+                term.start = (term.start+1) % MAX_LINES
                 delete(term.lines[term.start].txt)
                 term.lines[term.start] = line
-                term.end += 1
+                term.end = (term.end+1) % MAX_LINES
         }
         term.window = term.start
+        term.window_frac = 0
 }
 
 // Callback Functions
@@ -180,6 +194,7 @@ char_callback_terminal :: proc "c" (window: glfw.WindowHandle, code: rune) {
         // save the new string
         term.lines[term.start].txt = strings.to_string(bldr)
         term.window = term.start
+        term.window_frac = 0
         term.cursor += 1
 }
 
@@ -239,6 +254,50 @@ key_callback_terminal :: proc "c" (window: glfw.WindowHandle, key: i32, scancode
                         if term.cursor < len(term.lines[term.start].txt) {
                                 term.cursor += 1
                         }
+                }
+        }
+}
+
+scroll_callback_terminal :: proc "c" (window: glfw.WindowHandle, x_offset: f64, y_offset: f64) {
+        term: ^Terminal = cast(^Terminal)glfw.GetWindowUserPointer(window)
+        context = runtime.default_context()
+        y_offset := y_offset
+        scale := tr.calc_char_scale(term.chars, f32(TERMINAL_LINE_HEIGHT))
+        for y_offset > 0 {
+                if term.window == term.end+1 {
+                        term.window_frac = 0
+                        return
+                }
+                wraps := tr.wrap_lines(term.lines[term.window].txt, term.chars, term.width^-30, scale)
+                defer delete(wraps)
+                section_height := TERMINAL_LINE_HEIGHT*f64(len(wraps))
+                if y_offset < section_height * (1-term.window_frac) {
+                        term.window_frac += y_offset / section_height
+                        return
+                } else {
+                        term.window -= 1
+                        if term.window == -1 {
+                                term.window = MAX_LINES-1
+                        }
+                        y_offset -= (1-term.window_frac)*section_height
+                        term.window_frac = 0
+                }
+        }
+        for y_offset < 0 {
+               if term.window == term.start {
+                        term.window_frac = 0
+                        return
+                }
+                wraps := tr.wrap_lines(term.lines[term.window].txt, term.chars, term.width^-30, scale)
+                defer delete(wraps)
+                section_height := TERMINAL_LINE_HEIGHT*f64(len(wraps))
+                if (- y_offset) > section_height*term.window_frac {
+                        y_offset += section_height*term.window_frac
+                        term.window_frac = 1
+                        term.window = (term.window + 1) % MAX_LINES
+                } else {
+                        term.window_frac += y_offset / section_height
+                        return
                 }
         }
 }
@@ -345,10 +404,19 @@ read_command :: proc(term: ^Terminal, command: string) {
                         }
                         cat(term, args[1])
                 }
+                case "grep": {
+                        if len(args) < 3 {
+                                add_line(term, {strings.clone("Must provide pattern and file"), RED, Side.SYS})
+                                return
+                        }
+                        grep(term, args[1], args[2])
+                }
         }
         return
 }
 
+// Terminal commands 
+// ------------------------------------------------------------------
 ls :: proc(term: ^Terminal, path: string) {
         node: ^Node = follow_path(term.node, path)
         if node == nil {
@@ -385,7 +453,7 @@ cd :: proc(term: ^Terminal, path: string) {
                         width = term.width,
                         height = term.height,
                 }
-                lock := init_lock(config, node)
+                lock := init_lock(config, term)
                 queue.push_back(term.game_stack, Layer{lock, update_lock, cleanup_lock}) 
                 term.active = false
         }
@@ -410,14 +478,61 @@ cat :: proc(term: ^Terminal, path: string) {
                 return
         }
         file_path := strings.concatenate({"resources/files/", pos.file_ref})
-        fmt.println(file_path)
         defer delete(file_path)
-        file_contents, ok := os.read_entire_file_from_filename(file_path)
-        builder := strings.Builder{}
-        strings.write_bytes(&builder, file_contents)
-        if !ok {
+
+        // Open the file
+        f, ferr := os.open(file_path)
+	if ferr != 0 {
                 add_line(term, {strings.clone("Unable to open file."), RED, Side.SYS})
+		return
+	}
+	defer os.close(f)
+
+        // Create a buffered reader to the file contents
+	r: bufio.Reader
+	bufio.reader_init(&r, os.stream_from_handle(f), 1024)
+	defer bufio.reader_destroy(&r)
+        
+        // Get the last lines in the text (max we can fit into the buffer)
+        lines_to_print: [MAX_LINES]string
+        i := 0
+        for {
+                line, err := bufio.reader_read_string(&r, '\n')
+                if err != nil {
+                       break 
+                }
+                line = strings.trim_right(line, "\r")
+                delete(lines_to_print[i % MAX_LINES])
+                lines_to_print[i % MAX_LINES] = line
+                i += 1
+        }
+        for line in 0..<min(i, MAX_LINES) {
+                add_line(term, {lines_to_print[line], GREY, Side.SYS})
+        }
+}
+
+grep :: proc(term: ^Terminal, pattern: string, file: string) {
+        pos: ^Node = follow_path(term.node, file)
+        if pos == nil {
+                add_line(term, {strings.clone("Invalid path."), RED, Side.SYS})
                 return
         }
-        add_line(term, {strings.to_string(builder), GREY, Side.SYS})
+        if pos.type != File_Type.FILE {
+                add_line(term, {strings.clone("Not a file."), RED, Side.SYS})
+                return
+        }
+        file_path := strings.concatenate({"resources/files/", pos.file_ref})
+        defer delete(file_path)
+        file_contents, ok := os.read_entire_file_from_filename(file_path)
+        defer delete(file_contents)
+        text := string(file_contents)
+        idxs := bm_search(pattern, text)
+        for idx in idxs {
+                end: int = idx+len(pattern)
+                start: int = idx
+                for end < len(text) && text[end] != '\n' {end+=1}
+                for start > 0 && text[start] != '\n' {start-=1}
+                if start != 0 {start+=1}
+                add_line(term, {strings.clone(text[start:end]), GREY, Side.SYS})
+        }
 }

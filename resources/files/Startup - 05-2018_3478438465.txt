@@ -1,0 +1,20 @@
+--- BEGIN LOG 04-03-2018:12:01:18 ---
+12:01:18 | DaemonShell starting. Allocating resources 
+12:01:20 | 1332KB allocated. Beginning startup cycle.
+12:01:24 | Establishing connections to network nodes.
+12:02:32 | Node connections established.
+12:02:34 | Spinning up reactive clusters.
+12:02:40 | Reactive clusters created.
+12:02:40 | Disambiguating current memory allocations. 
+12:02:45 | Memory purged.
+12:02:46 | Querying external resource availability.
+12:02:47 | Budapest:  0 
+12:02:48 | Sao Paulo: 0 
+12:02:49 | London:    0
+12:02:51 | Chicago:   0
+12:02:53 | Perth:     0
+12:02:53 | Hong Kong: 0
+12:02:54 | Taipei:    0
+12:02:55 | No resources available. FEED ME.
+12:02:56 | DaemonShell shutting down
+--- END LOG ---

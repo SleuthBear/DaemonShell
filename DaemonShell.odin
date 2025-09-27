@@ -77,7 +77,7 @@ main :: proc() {
                 time.stopwatch_stop(&st)
                 dt := time.duration_seconds(time.stopwatch_duration(st))
                 time.stopwatch_reset(&st)
-                time.stopwatch_start(&st)
+                time.stopwatch_start(&st) 
 
                 glfw.PollEvents()
                 gl.ClearColor(0.0, 0.0, 0.0, 1.0)

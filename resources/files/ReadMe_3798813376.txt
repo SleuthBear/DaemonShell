@@ -1,0 +1,3 @@
+This repository holds the source code for the DaemonShell program, including peripheral libraries. To execute or restart the program, each peripheral library must be validated first.
+A validation script is available in this folder, and typing "imp run validation" will execute it. Imp will read out the results.
+DO NOT attempt to launch DaemonShell.exe without validating the libraries. This could have catastophic consequences.

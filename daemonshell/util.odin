@@ -45,3 +45,70 @@ load_texture :: proc(path: string) -> u32 {
         fmt.println("Failed to load texture", path)
         return 0
 }
+
+bm_search :: proc(pattern: string, text: string) -> [dynamic]int {
+        //bad_table := make([dynamic][128]int, len(pattern))
+        bad_table := make([dynamic]map[rune]int, len(pattern))
+        defer delete(bad_table)
+        char_idx := make(map[rune]int)
+        for char, idx in pattern {
+                char_idx[char] = idx
+                // get all possible chars we could jump to and get the most recent version
+                for cha2 in pattern {
+                        bad_table[idx][cha2] = idx - char_idx[cha2]
+                }
+        }
+
+        good_table := make([dynamic]int, len(pattern))
+        defer delete(good_table)
+        //#reverse for char, idx in pattern[len(pattern)/2:len(pattern)-1] {
+        // idx is the index for the first mismatch
+        for idx in 0..<len(pattern)-1 {
+                suffix := pattern[idx+1:len(pattern)]
+                // idx2 is the index we are saying we could shift to
+                for idx2 := idx-1; idx2 >= 0; idx2-=1 {
+                        if pattern[idx] != pattern[idx2] && string_cmp(pattern[idx2+1:idx2+1+len(suffix)], suffix) {
+                                good_table[idx] = idx-idx2
+                                break
+                        }
+                }
+        }
+        // search the actual text
+        results := make([dynamic]int)
+        i := len(pattern)-1
+        for i < len(text) {
+                j := 0
+                should_skip := false
+                for text[i-j] == pattern[len(pattern)-1-j] {
+                        if j == len(pattern)-1 {
+                                append(&results, i - len(pattern) + 1)
+                                should_skip = true
+                                break
+                        }
+                        j += 1
+                } 
+                if should_skip {
+                        should_skip = false
+                        i += 1
+                        continue
+                }
+                bad_result := bad_table[len(pattern)-1-j][rune(text[i-j])]
+                if bad_result == 0 {
+                        bad_result = len(pattern)-j
+                }
+                i += max(good_table[len(pattern)-1-j], bad_result)
+        }
+        return results
+}
+
+string_cmp :: proc(a, b: string) -> bool {
+        if len(a) != len(b) {
+                return false
+        }
+        for i := 0; i < len(a); i+=1 {
+                if a[i] != b[i] {
+                        return false
+                }
+        }
+        return true
+}

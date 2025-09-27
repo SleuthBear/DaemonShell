@@ -19,7 +19,7 @@ Lock_Config :: struct {
 }
 
 Lock :: struct {
-        node: ^Node,
+        term: ^Terminal,
         shader, VAO, VBO, tex: u32,
         width, height: ^f32,
         hint, answer, input: string,
@@ -34,9 +34,9 @@ Lock_Info :: struct {
         hint, answer: string,
 }
 
-init_lock :: proc(config: Lock_Config, node: ^Node) -> ^Lock {
+init_lock :: proc(config: Lock_Config, term: ^Terminal) -> ^Lock {
         lock := new(Lock)
-        lock.node = node
+        lock.term = term
         lock.answer = config.answer
         lock.hint = config.hint
         lock.width = config.width
@@ -109,6 +109,10 @@ key_callback_lock :: proc "c" (window: glfw.WindowHandle, key: i32, scancode: i3
                 return
         }
         switch key {
+                case glfw.KEY_ESCAPE: {
+                        lock.term.node = lock.term.node.parent
+                        lock.should_close = true;
+                }
                 case glfw.KEY_ENTER: {
                         // TODO locks opened saved
                         if (lock.input == lock.answer) {
@@ -191,9 +195,9 @@ cleanup_lock :: proc(lock: rawptr) {
 
 // This is implicitly allocated. Doesn't matter in this case, but good to know!
 saved_locks := map[string]Lock_Info{
-        "Backup_755012715.lock" = {"brother in law", "Jacob"},
-        "Code_163903526.lock" = {"first BDOWDC champion", "Leighton Rees"},
-        "Logs_1807696380.lock" = {"my zodiac element + symbol", "metal dragon"},
+        "System_3846323654.lock" = {"first BDOWDC champion", "Leighton Rees"},
+        "Logs_1807696380.lock" = {"my zodiac element + animal", "metal dragon"},
+        "Core_700622931.lock" = {"Chaos is order. Stability is ___", "stagnation"}
 }
         
 locks_opened := map[string]bool {}

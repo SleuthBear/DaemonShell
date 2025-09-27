@@ -110,7 +110,7 @@ render_imp :: proc(imp: ^Imp) {
                         x,              y-0.45*scale,           0.1,  1.0, 1.0, 1.0,  -1, -1,
                         x,              y-0.35*scale,           0.1,  1.0, 1.0, 1.0,  -1, -1,
                 )
-                tr.push_wrapped(imp.text[:int(imp.chars_to_print)], &imp.text_vecs, sub_wraps, imp.chars, x-1.5*scale+10, y-0.3*scale-10, line_height, {0,0.0,0})
+                tr.push_wrapped(imp.text[:int(imp.chars_to_print)], &imp.text_vecs, sub_wraps[:], imp.chars, x-1.5*scale+10, y-0.3*scale-10, line_height, {0,0.0,0})
         }
         
         gl.UseProgram(imp.shader)

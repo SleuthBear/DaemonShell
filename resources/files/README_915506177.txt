@@ -1,0 +1,6 @@
+The purpose of this module is to query external resources.
+This code acts as a library and will be used by DaemonShell without being run manually.
+To allow external resource acquisition to proceed, there must be adequate resources at the specified site. This site MUST be owned and operated by Grandbench Global as per the contract. Any sites not owned and operated by Grandbench Global are not eligible for external resource acquisition.
+
+If the existing sites becomes unusable, please replace these sites in the files
+active_sites.json. This file should be checked before monthly startup to avoid downtime of DaemonShell which could have large financial ramifications.

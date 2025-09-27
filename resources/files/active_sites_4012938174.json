@@ -1,0 +1,30 @@
+[
+	{
+	 "site_alias": "Budapest",
+	 "address": "Level 4 32 Maxwell St Budapest"
+	},
+	{
+	 "site_alias": "Sao Paulo",
+	 "address": "Level 32 da Silva Tower Sao Paulo"
+	},
+	{
+	 "site_alias": "London",
+	 "address": "37 Heatherton Ave London"
+	},
+	{
+	 "site_alias": "Chicago",
+	 "address": "19 Johnson Place Chicago"
+	},
+	{
+	 "site_alias": "Perth",
+	 "address": "Level 4 32 Maxwell St Budapest"
+	},
+	{
+	 "site_alias": "Hong Kong",
+	 "address": "15 Yu Square Hong Kong"
+	},
+	{
+	 "site_alias": "Taipei",
+	 "address": "Level 41 Smith Tower Taipei"
+	}
+]

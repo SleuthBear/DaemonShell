@@ -90,7 +90,7 @@ push_line :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, x: f
         y := y - chars['X'].bearing[1] * scale
         for c in text {
                 ch: Character
-                if (c == '\n') {
+                if (c > 127 || c == '\n') {
                         ch = chars[' ']
                 } else {
                         ch = chars[c]
@@ -128,7 +128,7 @@ wrap_and_push :: proc(text: string, vecs: ^[dynamic]f32, chars: [128]Character, 
         }
 }
 
-push_wrapped :: proc(text: string, vecs: ^[dynamic]f32, wraps: [dynamic]u32, chars: [128]Character, x: f32, y: f32, line_height: f32,  col: [3]f32) {
+push_wrapped :: proc(text: string, vecs: ^[dynamic]f32, wraps: []u32, chars: [128]Character, x: f32, y: f32, line_height: f32,  col: [3]f32) {
         scale := calc_char_scale(chars, line_height)
         idx: u32 = 0
         y_pos := y
