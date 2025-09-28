@@ -16,7 +16,14 @@
   {
     "file_ref": "Logs_1807696380.lock",
     "options": [
-      {"input":  "", "response": "This is a locked directory. You need a password to access it."}
+      {"input":  "", "response": ""}
+    ]
+  },
+  {
+    "file_ref": "System_3846323654.lock",
+    "options": [
+      {"input":  "", "response": "This directory holds all of the source code for the DaemonShell"},
+      {"input": "help", "response": "You can use the command \"grep [WORD] [TARGET_FILE]\" to search a text file. Maybe you can find a clue?"}
     ]
   }
 ]
