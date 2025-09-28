@@ -29,7 +29,7 @@ main :: proc() {
         glfw.WindowHint(glfw.OPENGL_FORWARD_COMPAT, glfw.TRUE)
         defer glfw.Terminate()
 
-        window := glfw.CreateWindow(i32(WIDTH), i32(HEIGHT), "Odin Shell", nil, nil)
+        window := glfw.CreateWindow(i32(WIDTH), i32(HEIGHT), "DaemonShell", nil, nil)
         if window == nil {
                 fmt.println("Failed to create window")
                 return
